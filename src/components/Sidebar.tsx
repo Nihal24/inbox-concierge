@@ -161,7 +161,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '1px 7px', marginLeft: 'auto',
   },
   divider: { height: 1, backgroundColor: '#1e2028', margin: '0 12px' },
-  bucketList: { padding: '8px 8px 0', flex: 0, overflowY: 'auto' as const },
+  bucketList: { padding: '8px 8px 0', overflowY: 'auto' as const, flex: '1 1 auto' },
   sectionLabel: {
     fontSize: 10, color: '#444', fontWeight: 700,
     textTransform: 'uppercase', letterSpacing: 0.8,
@@ -199,7 +199,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 7, color: '#555', padding: '7px 10px',
     cursor: 'pointer', fontSize: 12, width: '100%', textAlign: 'left' as const,
   },
-  spacer: { flex: 1 },
+  spacer: { flex: '0 0 0' },
   footer: { padding: '12px 12px 16px', borderTop: '1px solid #1e2028', display: 'flex', flexDirection: 'column', gap: 8 },
   memoryChip: { fontSize: 11, color: '#555', padding: '0 2px' },
   signOutBtn: {
