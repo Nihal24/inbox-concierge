@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { fetchThreads, EmailThread } from '../utils/gmail';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { fetchThreads, EmailThread, getLastFetchedTimestamp } from '../utils/gmail';
 import { classifyEmails, ClassifiedEmail, DEFAULT_BUCKETS, generateInboxSummary, InboxSummary } from '../utils/classify';
+import { getMemoryCount } from '../utils/senderMemory';
 import BucketColumn from './BucketColumn';
 import EmailDetailModal from './EmailDetailModal';
 import AnalyticsPanel from './AnalyticsPanel';
@@ -18,7 +19,6 @@ const BUCKET_COLORS: Record<string, string> = {
   'Auto-archive': '#6b7280',
   'Social': '#10b981',
 };
-
 const EXTRA_COLORS = ['#f59e0b', '#ec4899', '#06b6d4', '#84cc16', '#f97316'];
 
 function getBucketColor(bucket: string, allBuckets: string[]): string {
@@ -39,10 +39,14 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
   const [summary, setSummary] = useState<InboxSummary | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<ClassifiedEmail | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [newEmailCount, setNewEmailCount] = useState<number | null>(null);
+  const [memoryCount, setMemoryCount] = useState(0);
 
-  const bucketColorMap = Object.fromEntries(
-    buckets.map((b) => [b, getBucketColor(b, buckets)])
-  );
+  const bucketsRef = useRef(buckets);
+  bucketsRef.current = buckets;
+
+  const bucketColorMap = Object.fromEntries(buckets.map((b) => [b, getBucketColor(b, buckets)]));
 
   const runClassification = useCallback(async (threads: EmailThread[], currentBuckets: string[]) => {
     setReclassifying(true);
@@ -69,11 +73,35 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
       );
       setEmails(classified);
       setLoading(false);
-      setLoadingMsg('Generating summary...');
+      setMemoryCount(getMemoryCount());
       const s = await generateInboxSummary(classified);
       setSummary(s);
     })();
   }, [accessToken]);
+
+  const handleRefresh = async () => {
+    const lastTs = getLastFetchedTimestamp();
+    if (!lastTs) return;
+    setRefreshing(true);
+    setNewEmailCount(null);
+    try {
+      const newThreads = await fetchThreads(accessToken, lastTs);
+      const existingIds = new Set(rawThreads.map((t) => t.id));
+      const brandNew = newThreads.filter((t) => !existingIds.has(t.id));
+      if (brandNew.length === 0) {
+        setNewEmailCount(0);
+        setTimeout(() => setNewEmailCount(null), 3000);
+        return;
+      }
+      const classified = await classifyEmails(brandNew, bucketsRef.current, () => {});
+      setEmails((prev) => [...classified, ...prev]);
+      setRawThreads((prev) => [...brandNew, ...prev]);
+      setNewEmailCount(brandNew.length);
+      setTimeout(() => setNewEmailCount(null), 4000);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const addBucket = async () => {
     const name = newBucket.trim();
@@ -95,6 +123,13 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
     setEmails((prev) => prev.filter((e) => e.bucket !== bucket));
   };
 
+  const handleMove = (emailId: string, newBucket: string) => {
+    setEmails((prev) => prev.map((e) => e.id === emailId ? { ...e, bucket: newBucket } : e));
+    setMemoryCount(getMemoryCount() + 1);
+    // Update selected email bucket label live
+    setSelectedEmail((prev) => prev && prev.id === emailId ? { ...prev, bucket: newBucket } : prev);
+  };
+
   const emailsByBucket = buckets.reduce<Record<string, ClassifiedEmail[]>>((acc, b) => {
     acc[b] = emails.filter((e) => e.bucket === b);
     return acc;
@@ -114,21 +149,37 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
           </div>
         </div>
         <div style={styles.headerRight}>
+          {!loading && memoryCount > 0 && (
+            <div style={styles.memoryBadge}>
+              🧠 {memoryCount} learned
+            </div>
+          )}
           {!loading && emails.length > 0 && (
             <button onClick={() => setShowAnalytics(true)} style={styles.analyticsBtn}>
               📊 Analytics
             </button>
           )}
-          {!loading && <span style={styles.totalCount}>{emails.length} emails sorted</span>}
+          {!loading && (
+            <button onClick={handleRefresh} style={styles.refreshBtn} disabled={refreshing}>
+              {refreshing ? '...' : '↻ Refresh'}
+            </button>
+          )}
+          {!loading && <span style={styles.totalCount}>{emails.length} emails</span>}
           <button onClick={onSignOut} style={styles.signOutBtn}>Sign out</button>
         </div>
       </div>
+
+      {/* New email toast */}
+      {newEmailCount !== null && (
+        <div style={{ ...styles.toast, backgroundColor: newEmailCount > 0 ? '#1d4ed8' : '#16181f' }}>
+          {newEmailCount > 0 ? `✓ ${newEmailCount} new email${newEmailCount > 1 ? 's' : ''} added` : 'No new emails'}
+        </div>
+      )}
 
       {/* Loading overlay */}
       {isLoading && (
         <div style={styles.loadingOverlay}>
           <div style={styles.loadingCard}>
-            <div style={styles.loadingSpinner}>⟳</div>
             <div style={styles.loadingMsg}>{loadingMsg}</div>
             <div style={styles.progressBar}>
               <div style={{ ...styles.progressFill, width: `${progress}%` }} />
@@ -178,9 +229,7 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
               onChange={(e) => setNewBucket(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addBucket()}
             />
-            <button onClick={addBucket} style={styles.addBtn} disabled={!newBucket.trim()}>
-              + Add
-            </button>
+            <button onClick={addBucket} style={styles.addBtn} disabled={!newBucket.trim()}>+ Add</button>
           </div>
         </div>
       )}
@@ -207,7 +256,10 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
           email={selectedEmail}
           accessToken={accessToken}
           bucketColor={bucketColorMap[selectedEmail.bucket] || '#888'}
+          buckets={buckets}
+          bucketColors={bucketColorMap}
           onClose={() => setSelectedEmail(null)}
+          onMove={handleMove}
         />
       )}
 
@@ -225,12 +277,9 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    minHeight: '100vh',
-    backgroundColor: '#0d0f14',
-    color: '#f0f0f0',
+    minHeight: '100vh', backgroundColor: '#0d0f14', color: '#f0f0f0',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    display: 'flex',
-    flexDirection: 'column',
+    display: 'flex', flexDirection: 'column',
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -241,11 +290,20 @@ const styles: Record<string, React.CSSProperties> = {
   logo: { fontSize: 28 },
   appName: { fontSize: 18, fontWeight: 800, color: '#f0f0f0', letterSpacing: -0.5 },
   userEmail: { fontSize: 12, color: '#555', marginTop: 1 },
-  headerRight: { display: 'flex', alignItems: 'center', gap: 12 },
+  headerRight: { display: 'flex', alignItems: 'center', gap: 10 },
+  memoryBadge: {
+    fontSize: 12, color: '#888', backgroundColor: '#16181f',
+    border: '1px solid #2a2d35', padding: '4px 10px', borderRadius: 20,
+  },
   analyticsBtn: {
     backgroundColor: '#16181f', border: '1px solid #2a2d35',
     color: '#c0c0c0', padding: '6px 14px', borderRadius: 8,
     cursor: 'pointer', fontSize: 13, fontWeight: 600,
+  },
+  refreshBtn: {
+    backgroundColor: 'transparent', border: '1px solid #2a2d35',
+    color: '#888', padding: '6px 14px', borderRadius: 8,
+    cursor: 'pointer', fontSize: 13,
   },
   totalCount: { fontSize: 13, color: '#555' },
   signOutBtn: {
@@ -253,17 +311,17 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#888', padding: '6px 14px', borderRadius: 8,
     cursor: 'pointer', fontSize: 13,
   },
-  loadingOverlay: {
-    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40,
+  toast: {
+    position: 'fixed', bottom: 24, left: '50%',
+    transform: 'translateX(-50%)',
+    color: '#fff', padding: '10px 20px', borderRadius: 20,
+    fontSize: 13, fontWeight: 600, zIndex: 2000,
+    border: '1px solid #2a2d35',
   },
+  loadingOverlay: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 },
   loadingCard: {
     backgroundColor: '#111318', border: '1px solid #2a2d35',
     borderRadius: 16, padding: '40px 48px', textAlign: 'center', minWidth: 320,
-  },
-  loadingSpinner: {
-    fontSize: 32, marginBottom: 16, display: 'inline-block',
-    animation: 'spin 1s linear infinite',
-    color: '#3b82f6',
   },
   loadingMsg: { fontSize: 15, color: '#c0c0c0', marginBottom: 20 },
   progressBar: { height: 6, backgroundColor: '#1e2028', borderRadius: 3, overflow: 'hidden', marginBottom: 10 },
@@ -271,8 +329,7 @@ const styles: Record<string, React.CSSProperties> = {
   progressPct: { fontSize: 13, color: '#555' },
   summaryCard: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    margin: '12px 24px 0',
-    backgroundColor: '#0d1117', border: '1px solid #1e3a5f',
+    margin: '12px 24px 0', backgroundColor: '#0d1117', border: '1px solid #1e3a5f',
     borderRadius: 12, padding: '14px 20px', gap: 16, flexShrink: 0,
   },
   summaryLeft: { display: 'flex', alignItems: 'flex-start', gap: 12, flex: 1 },
@@ -294,8 +351,7 @@ const styles: Record<string, React.CSSProperties> = {
   bucketPills: { display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1 },
   bucketPill: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '4px 10px', borderRadius: 20, border: '1px solid',
-    fontSize: 12, backgroundColor: 'transparent',
+    padding: '4px 10px', borderRadius: 20, border: '1px solid', fontSize: 12, backgroundColor: 'transparent',
   },
   pillDot: { width: 6, height: 6, borderRadius: '50%', flexShrink: 0 },
   pillLabel: { color: '#c0c0c0', fontWeight: 500 },
@@ -308,9 +364,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13, outline: 'none', width: 160,
   },
   addBtn: {
-    backgroundColor: '#1d4ed8', border: 'none',
-    borderRadius: 8, color: '#fff', padding: '6px 14px',
-    fontSize: 13, cursor: 'pointer', fontWeight: 600,
+    backgroundColor: '#1d4ed8', border: 'none', borderRadius: 8,
+    color: '#fff', padding: '6px 14px', fontSize: 13, cursor: 'pointer', fontWeight: 600,
   },
   columns: {
     display: 'flex', gap: 16, padding: '16px 24px',

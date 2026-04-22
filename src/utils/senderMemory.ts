@@ -1,0 +1,32 @@
+const STORAGE_KEY = 'inbox_sender_memory';
+
+export interface SenderMemory {
+  [senderEmail: string]: string; // email address → bucket
+}
+
+export function extractEmailAddress(from: string): string {
+  const match = from.match(/<([^>]+)>/);
+  return (match ? match[1] : from).toLowerCase().trim();
+}
+
+export function getSenderMemory(): SenderMemory {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+export function saveSenderPreference(from: string, bucket: string): void {
+  const memory = getSenderMemory();
+  memory[extractEmailAddress(from)] = bucket;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(memory));
+}
+
+export function clearSenderMemory(): void {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+export function getMemoryCount(): number {
+  return Object.keys(getSenderMemory()).length;
+}

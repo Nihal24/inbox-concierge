@@ -7,9 +7,21 @@ export interface EmailThread {
   unread: boolean;
 }
 
-export async function fetchThreads(accessToken: string): Promise<EmailThread[]> {
+const LAST_FETCHED_KEY = 'inbox_last_fetched_ts';
+
+export function saveLastFetchedTimestamp(): void {
+  localStorage.setItem(LAST_FETCHED_KEY, Math.floor(Date.now() / 1000).toString());
+}
+
+export function getLastFetchedTimestamp(): number | null {
+  const val = localStorage.getItem(LAST_FETCHED_KEY);
+  return val ? parseInt(val) : null;
+}
+
+export async function fetchThreads(accessToken: string, afterTimestamp?: number): Promise<EmailThread[]> {
+  const q = afterTimestamp ? `in:inbox after:${afterTimestamp}` : 'in:inbox';
   const listRes = await fetch(
-    'https://gmail.googleapis.com/gmail/v1/users/me/threads?maxResults=200&q=in:inbox',
+    `https://gmail.googleapis.com/gmail/v1/users/me/threads?maxResults=200&q=${encodeURIComponent(q)}`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
   const listData = await listRes.json();
@@ -44,6 +56,7 @@ export async function fetchThreads(accessToken: string): Promise<EmailThread[]> 
     results.push(...fetched);
   }
 
+  saveLastFetchedTimestamp();
   return results;
 }
 

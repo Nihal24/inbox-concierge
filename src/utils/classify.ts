@@ -1,4 +1,5 @@
 import { EmailThread } from './gmail';
+import { getSenderMemory, extractEmailAddress } from './senderMemory';
 
 export const DEFAULT_BUCKETS = ['Important', 'Can Wait', 'Newsletter', 'Auto-archive', 'Social'];
 
@@ -92,22 +93,43 @@ export async function classifyEmails(
   onProgress: (pct: number) => void
 ): Promise<ClassifiedEmail[]> {
   const BATCH_SIZE = 25;
-  const batches: EmailThread[][] = [];
-  for (let i = 0; i < emails.length; i += BATCH_SIZE) {
-    batches.push(emails.slice(i, i + BATCH_SIZE));
+  const memory = getSenderMemory();
+
+  // Pre-assign emails from known senders — no Claude call needed
+  const preAssigned: Record<string, { bucket: string; urgency: 'high' | 'medium' | 'low' }> = {};
+  const needsClassification: EmailThread[] = [];
+
+  for (const email of emails) {
+    const senderEmail = extractEmailAddress(email.from);
+    if (memory[senderEmail] && buckets.includes(memory[senderEmail])) {
+      preAssigned[email.id] = { bucket: memory[senderEmail], urgency: 'low' };
+    } else {
+      needsClassification.push(email);
+    }
   }
 
-  const resultMap: Record<string, { bucket: string; urgency: 'high' | 'medium' | 'low' }> = {};
-  let completed = 0;
+  const resultMap: Record<string, { bucket: string; urgency: 'high' | 'medium' | 'low' }> = {
+    ...preAssigned,
+  };
 
-  await Promise.all(
-    batches.map(async (batch) => {
-      const results = await classifyBatch(batch, buckets);
-      results.forEach((r) => { resultMap[r.id] = { bucket: r.bucket, urgency: r.urgency }; });
-      completed += batch.length;
-      onProgress(Math.round((completed / emails.length) * 100));
-    })
-  );
+  let completed = Object.keys(preAssigned).length;
+  onProgress(Math.round((completed / emails.length) * 100));
+
+  if (needsClassification.length > 0) {
+    const batches: EmailThread[][] = [];
+    for (let i = 0; i < needsClassification.length; i += BATCH_SIZE) {
+      batches.push(needsClassification.slice(i, i + BATCH_SIZE));
+    }
+
+    await Promise.all(
+      batches.map(async (batch) => {
+        const results = await classifyBatch(batch, buckets);
+        results.forEach((r) => { resultMap[r.id] = { bucket: r.bucket, urgency: r.urgency }; });
+        completed += batch.length;
+        onProgress(Math.round((completed / emails.length) * 100));
+      })
+    );
+  }
 
   return emails.map((e) => ({
     ...e,
