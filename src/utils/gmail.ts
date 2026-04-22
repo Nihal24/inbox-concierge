@@ -39,13 +39,18 @@ export async function fetchThreads(accessToken: string, afterTimestamp?: number)
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
         const data = await res.json();
-        const msg = data.messages?.[0];
+        const messages = data.messages || [];
+        // Use last message for most recent subject/from; fall back to first
+        const msg = messages[messages.length - 1] || messages[0];
+        const firstMsg = messages[0];
         const headers: { name: string; value: string }[] = msg?.payload?.headers || [];
-        const get = (name: string) => headers.find((h) => h.name === name)?.value || '';
-        const unread: boolean = (msg?.labelIds || []).includes('UNREAD');
+        const get = (name: string) =>
+          headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || '';
+        const unread: boolean = (firstMsg?.labelIds || []).includes('UNREAD');
+        const subject = get('Subject') || data.snippet?.slice(0, 60) || '(no subject)';
         return {
           id: t.id,
-          subject: get('Subject') || '(no subject)',
+          subject,
           from: get('From'),
           snippet: data.snippet || '',
           date: get('Date'),
