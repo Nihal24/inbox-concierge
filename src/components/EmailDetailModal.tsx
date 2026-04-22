@@ -92,6 +92,26 @@ const EmailDetailModal: React.FC<Props> = ({ email, accessToken, bucketColor, on
           <div style={styles.snippetLabel}>Preview</div>
           <p style={styles.snippetText}>{email.snippet}</p>
         </div>
+
+        {/* Actions */}
+        <div style={styles.actions}>
+          <a
+            href={`https://mail.google.com/mail/u/0/#inbox/${email.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={styles.actionBtnPrimary}
+          >
+            ↗ Open in Gmail
+          </a>
+          <a
+            href={`https://mail.google.com/mail/u/0/?view=cm&tf=1&in_reply_to=${email.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={styles.actionBtnSecondary}
+          >
+            ↩ Reply
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -157,6 +177,19 @@ const styles: Record<string, React.CSSProperties> = {
   snippetSection: {},
   snippetLabel: { fontSize: 11, color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
   snippetText: { fontSize: 13, color: '#666', lineHeight: 1.5, margin: 0 },
+  actions: { display: 'flex', gap: 10, paddingTop: 4 },
+  actionBtnPrimary: {
+    flex: 1, textAlign: 'center' as const, padding: '10px 16px',
+    backgroundColor: '#1d4ed8', borderRadius: 10,
+    color: '#fff', fontWeight: 700, fontSize: 14,
+    textDecoration: 'none',
+  },
+  actionBtnSecondary: {
+    flex: 1, textAlign: 'center' as const, padding: '10px 16px',
+    backgroundColor: '#16181f', border: '1px solid #2a2d35', borderRadius: 10,
+    color: '#c0c0c0', fontWeight: 600, fontSize: 14,
+    textDecoration: 'none',
+  },
 };
 
 export default EmailDetailModal;

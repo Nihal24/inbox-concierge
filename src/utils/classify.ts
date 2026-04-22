@@ -53,19 +53,19 @@ Reply ONLY with a JSON array:
 [{"index": 1, "bucket": "Important", "urgency": "high"}, ...]
 
 Bucket rules:
-- "Important" = direct personal emails from real people; bill payments due, appointment reminders, healthcare; bank/financial alerts needing action (Robinhood trades, account alerts); emails from employer/boss; anything where YOU need to do something soon.
+- "Important" = direct personal emails from real people; bill payments due, appointment reminders, healthcare; bank/financial alerts needing YOUR action (Robinhood margin calls, account verification, security alerts — NOT trade confirmations); emails from employer/boss; anything where YOU personally need to do something.
 - "Can Wait" = non-urgent personal emails, low-priority follow-ups, informational emails that don't require immediate action
 - "Newsletter" = marketing emails, promotional deals, food/restaurant offers (Papa John's, DoorDash, Uber Eats etc), brand sales, subscription digests, blog content
-- "Auto-archive" = order confirmations, shipping/delivery notifications, receipts, password resets, automated system alerts, "your account" emails that need no action
+- "Auto-archive" = order confirmations, shipping/delivery notifications, receipts, password resets, automated system alerts, "your account" emails that need no action; Robinhood trade confirmations, dividend notifications, statements, order filled confirmations
 - "Social" = ALL Reddit emails (comments, replies, mentions, trending posts); ALL LinkedIn emails (connections, job alerts, notifications, "don't miss"); ALL Facebook/Instagram/Twitter/TikTok/Snapchat/Discord/dating app notifications; any social network activity whatsoever
 - Custom buckets: use best judgment based on name
 - Bias STRONGLY toward Social for any Reddit/LinkedIn/social platform email — never put these in Important
 - When in doubt between Important and others, use the more specific bucket
 
-Urgency (include for all, most meaningful for Important):
-- "high" = due today, time-sensitive deadline, needs immediate response
-- "medium" = needs response or action this week
-- "low" = no urgency
+Urgency = how urgently THE USER needs to take action (not how urgent the content is):
+- "high" = user must respond or act TODAY (e.g. payment overdue, meeting in hours, explicit deadline today)
+- "medium" = user should act this week (follow-up needed, upcoming appointment)
+- "low" = no action needed from user, or no deadline (community alerts, FYI emails, newsletters = always "low")
 
 Reply with ONLY the JSON array, no other text.`;
 
