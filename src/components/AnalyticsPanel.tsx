@@ -11,9 +11,11 @@ interface Props {
 function getTopSenders(emails: ClassifiedEmail[]): { name: string; count: number }[] {
   const counts: Record<string, number> = {};
   for (const e of emails) {
+    if (!e.from) continue;
     const match = e.from.match(/^"?([^"<]+)"?\s*</);
     const name = (match ? match[1].trim() : e.from.replace(/<.*>/, '').trim()) || e.from;
-    const key = name.split('@')[0];
+    const key = name.split('@')[0].trim();
+    if (!key) continue;
     counts[key] = (counts[key] || 0) + 1;
   }
   return Object.entries(counts)
@@ -32,7 +34,7 @@ const AnalyticsPanel: React.FC<Props> = ({ emails, bucketColors, onClose }) => {
 
   const noiseCount = (bucketCounts['Newsletter'] || 0) + (bucketCounts['Auto-archive'] || 0) + (bucketCounts['Social'] || 0);
   const noisePercent = Math.round((noiseCount / emails.length) * 100);
-  const importantCount = bucketCounts['Important'] || 0;
+  const importantCount = bucketCounts['Action Required'] || 0;
   const unreadCount = emails.filter((e) => e.unread).length;
   const topSenders = getTopSenders(emails);
 
@@ -61,7 +63,7 @@ const AnalyticsPanel: React.FC<Props> = ({ emails, bucketColors, onClose }) => {
         <div style={styles.statRow}>
           <div style={styles.statCard}>
             <div style={{ ...styles.statNum, color: '#ef4444' }}>{importantCount}</div>
-            <div style={styles.statLabel}>Important</div>
+            <div style={styles.statLabel}>Action Req.</div>
           </div>
           <div style={styles.statCard}>
             <div style={{ ...styles.statNum, color: '#f59e0b' }}>{unreadCount}</div>
