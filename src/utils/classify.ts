@@ -1,7 +1,15 @@
 import { EmailThread } from './gmail';
 import { getSenderMemory, extractEmailAddress } from './senderMemory';
 
-export const DEFAULT_BUCKETS = ['Important', 'Can Wait', 'Newsletter', 'Auto-archive', 'Social'];
+export const DEFAULT_BUCKETS = ['Action Required', 'Heads Up', 'Newsletter', 'Social', 'Junk'];
+
+export const BUCKET_DESCRIPTIONS: Record<string, string> = {
+  'Action Required': 'A real person needs something from you',
+  'Heads Up': 'Worth seeing, no action needed — transactions, alerts, confirmations',
+  'Newsletter': 'Subscribed content, digests, blogs, promotions',
+  'Social': 'Social platform notifications',
+  'Junk': 'Pure noise — marketing, spam, promos you never read',
+};
 
 export interface ClassifiedEmail extends EmailThread {
   bucket: string;
@@ -53,21 +61,21 @@ ${emailList}
 Reply ONLY with a JSON array:
 [{"index": 1, "bucket": "Important", "urgency": "high"}, ...]
 
-IMPORTANT RULE: "Important" is ONLY for emails where a real human personally addressed the user and expects a response or action. If an email could have been sent to thousands of people automatically, it is NOT Important.
+CRITICAL RULE: "Action Required" is ONLY for emails where a real human personally wrote to this user and expects a response or action. Automated emails are NEVER "Action Required".
 
 Bucket rules:
-- "Important" = a real person wrote this specifically to you; personal bills/appointments requiring action; your employer or a colleague; someone waiting on your response. STRICT: if it's automated, a notification, a digest, a tip, an alert, or marketing — it is NOT Important regardless of how urgent it sounds.
-- "Can Wait" = non-urgent personal emails; informational content you may want to read; job application follow-ups; community posts (neighborhood/HOA alerts like "motorcycle accident" or "safety tips" — these are FYI, not action items)
-- "Newsletter" = any marketing email; event registrations; promotional offers; job listing digests (Idealist, Indeed, Glassdoor alerts); course/workshop promotions; health/wellness tips; brand content; anything with "unsubscribe" at the bottom
-- "Auto-archive" = order/payment confirmations; shipping updates; receipts; password resets; "your account" automated emails; ALL Robinhood emails (trade fills, safety tips, account alerts, statements, promotions — all of it); bank transaction alerts that need no action; automated app notifications
-- "Social" = ALL Reddit, LinkedIn, Facebook, Instagram, Twitter/X, TikTok, Snapchat, Discord, dating apps; social network activity of any kind
+- "Action Required" = a real person wrote this specifically to you; personal bills/appointments you must act on; your employer, colleague, or friend waiting on you. NEVER automated, NEVER a notification, NEVER marketing.
+- "Heads Up" = automated emails worth monitoring but requiring no action: ALL bank/financial alerts (Wells Fargo, Zelle, Venmo, PayPal, Robinhood trades/confirmations/statements), security alerts, package delivered, account activity, neighborhood/community alerts (HOA, safety posts), order confirmations, shipping updates, receipts, password resets, job application status updates
+- "Newsletter" = marketing emails; promotional offers; food/restaurant deals; event/workshop invitations; job listing digests (Idealist, Indeed); health/wellness tips; brand content; anything with an unsubscribe link that isn't a transaction
+- "Social" = ALL Reddit, LinkedIn, Facebook, Instagram, Twitter/X, TikTok, Snapchat, Discord, dating apps; any social network activity
+- "Junk" = pure spam, irrelevant cold outreach, mass promotional blasts with no personal relevance
 - Custom buckets: use best judgment based on the name
-- When in doubt, pick anything EXCEPT Important
+- Default to "Heads Up" for anything automated and potentially useful, "Newsletter" for subscribed content, "Junk" for obvious noise
 
-Urgency = only how urgently THE USER personally needs to act (never the urgency of world events):
-- "high" = user must act TODAY — overdue payment, same-day deadline, urgent personal request
-- "medium" = user should act this week — upcoming appointment, follow-up needed
-- "low" = everything else, including all automated emails, community alerts, newsletters
+Urgency = only how urgently THE USER personally needs to act:
+- "high" = must act TODAY — overdue, same-day deadline, urgent personal request
+- "medium" = should act this week — upcoming appointment, reply needed soon
+- "low" = everything else (all automated, all newsletters, all social)
 
 Reply with ONLY the JSON array, no other text.`;
 
@@ -143,9 +151,9 @@ export async function generateInboxSummary(emails: ClassifiedEmail[]): Promise<I
   const bucketCounts: Record<string, number> = {};
   emails.forEach((e) => { bucketCounts[e.bucket] = (bucketCounts[e.bucket] || 0) + 1; });
 
-  const important = emails.filter((e) => e.bucket === 'Important');
+  const important = emails.filter((e) => e.bucket === 'Action Required');
   const highUrgency = important.filter((e) => e.urgency === 'high');
-  const noiseCount = (bucketCounts['Newsletter'] || 0) + (bucketCounts['Auto-archive'] || 0) + (bucketCounts['Social'] || 0);
+  const noiseCount = (bucketCounts['Newsletter'] || 0) + (bucketCounts['Junk'] || 0) + (bucketCounts['Social'] || 0);
   const noisePercent = Math.round((noiseCount / emails.length) * 100);
 
   const importantSubjects = important.slice(0, 5).map((e) => e.subject).join(', ');

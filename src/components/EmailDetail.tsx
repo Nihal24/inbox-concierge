@@ -101,7 +101,7 @@ const EmailDetail: React.FC<Props> = ({ email, accessToken, buckets, bucketColor
           <div style={styles.bucketTag}>
             <span style={{ ...styles.bucketDot, backgroundColor: bucketColor }} />
             <span style={{ ...styles.bucketLabel, color: bucketColor }}>{currentBucket}</span>
-            {currentBucket === 'Important' && urgency !== 'low' && (
+            {currentBucket === 'Action Required' && urgency !== 'low' && (
               <span style={{ ...styles.urgencyTag, color: urgCfg.color, backgroundColor: urgCfg.bg }}>
                 {urgCfg.label}
               </span>

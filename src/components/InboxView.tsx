@@ -14,11 +14,11 @@ interface Props {
 }
 
 const BUCKET_COLORS: Record<string, string> = {
-  'Important': '#ef4444',
-  'Can Wait': '#3b82f6',
+  'Action Required': '#ef4444',
+  'Heads Up': '#f59e0b',
   'Newsletter': '#8b5cf6',
-  'Auto-archive': '#6b7280',
   'Social': '#10b981',
+  'Junk': '#6b7280',
 };
 const EXTRA_COLORS = ['#f59e0b', '#ec4899', '#06b6d4', '#84cc16', '#f97316'];
 

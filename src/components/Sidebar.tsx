@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ClassifiedEmail, DEFAULT_BUCKETS } from '../utils/classify';
+import { ClassifiedEmail, DEFAULT_BUCKETS, BUCKET_DESCRIPTIONS } from '../utils/classify';
 
 interface Props {
   buckets: string[];
@@ -27,6 +27,7 @@ const Sidebar: React.FC<Props> = ({
   onRemoveBucket, onNewBucketChange, onSignOut,
 }) => {
   const [addingBucket, setAddingBucket] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
 
   const countFor = (b: string) => emails.filter((e) => e.bucket === b).length;
   const unreadFor = (b: string) => emails.filter((e) => e.bucket === b && e.unread).length;
@@ -119,6 +120,27 @@ const Sidebar: React.FC<Props> = ({
 
       {/* Footer */}
       <div style={styles.footer}>
+        {/* Legend toggle */}
+        <button onClick={() => setShowLegend(v => !v)} style={styles.legendToggle}>
+          {showLegend ? '▾' : '▸'} Bucket guide
+        </button>
+        {showLegend && (
+          <div style={styles.legend}>
+            {[...DEFAULT_BUCKETS, ...Object.keys(BUCKET_DESCRIPTIONS).filter(k => !DEFAULT_BUCKETS.includes(k))].map((b) => {
+              const desc = BUCKET_DESCRIPTIONS[b];
+              if (!desc) return null;
+              return (
+                <div key={b} style={styles.legendRow}>
+                  <span style={{ ...styles.legendDot, backgroundColor: bucketColors[b] || '#666' }} />
+                  <div>
+                    <div style={styles.legendName}>{b}</div>
+                    <div style={styles.legendDesc}>{desc}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
         {memoryCount > 0 && (
           <div style={styles.memoryChip}>🧠 {memoryCount} sender{memoryCount > 1 ? 's' : ''} learned</div>
         )}
@@ -201,6 +223,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   spacer: { flex: '0 0 0' },
   footer: { padding: '12px 12px 16px', borderTop: '1px solid #1e2028', display: 'flex', flexDirection: 'column', gap: 8 },
+  legendToggle: {
+    background: 'none', border: 'none', color: '#555',
+    fontSize: 11, cursor: 'pointer', padding: '2px 0',
+    textAlign: 'left' as const, fontWeight: 600, letterSpacing: 0.2,
+  },
+  legend: { display: 'flex', flexDirection: 'column', gap: 10, padding: '6px 0 4px' },
+  legendRow: { display: 'flex', alignItems: 'flex-start', gap: 8 },
+  legendDot: { width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginTop: 4 },
+  legendName: { fontSize: 11, color: '#aaa', fontWeight: 700, marginBottom: 1 },
+  legendDesc: { fontSize: 10, color: '#555', lineHeight: 1.4 },
   memoryChip: { fontSize: 11, color: '#555', padding: '0 2px' },
   signOutBtn: {
     background: 'none', border: '1px solid #1e2028',

@@ -31,7 +31,7 @@ function formatDate(dateStr: string): string {
 const URGENCY_COLORS = { high: '#ef4444', medium: '#f59e0b', low: 'transparent' };
 
 const EmailList: React.FC<Props> = ({ bucket, emails, selectedId, bucketColor, onSelect }) => {
-  const sorted = bucket === 'Important'
+  const sorted = bucket === 'Action Required'
     ? [...emails].sort((a, b) => {
         const order = { high: 0, medium: 1, low: 2 };
         return order[a.urgency || 'low'] - order[b.urgency || 'low'];
