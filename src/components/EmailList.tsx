@@ -74,22 +74,22 @@ const EmailList: React.FC<Props> = ({ bucket, emails, selectedId, bucketColor, o
                     <span style={{
                       ...styles.from,
                       fontWeight: e.unread ? 700 : 500,
-                      color: selected ? '#1a1a1a' : e.unread ? '#f0f0f0' : '#999',
+                      color: selected ? '#1a1a1a' : e.unread ? '#111' : '#666',
                     }}>
                       {formatFrom(e.from)}
                     </span>
-                    <span style={{ ...styles.date, color: selected ? '#888' : '#555' }}>
+                    <span style={{ ...styles.date, color: selected ? '#888' : '#777' }}>
                       {formatDate(e.date)}
                     </span>
                   </div>
                   <div style={{
                     ...styles.subject,
                     fontWeight: e.unread ? 600 : 400,
-                    color: selected ? '#1a1a1a' : e.unread ? '#e0e0e0' : '#888',
+                    color: selected ? '#1a1a1a' : e.unread ? '#222' : '#777',
                   }}>
                     {e.subject}
                   </div>
-                  <div style={{ ...styles.snippet, color: selected ? '#666' : '#444' }}>
+                  <div style={{ ...styles.snippet, color: selected ? '#666' : '#999' }}>
                     {e.snippet}
                   </div>
                 </div>
