@@ -53,20 +53,21 @@ ${emailList}
 Reply ONLY with a JSON array:
 [{"index": 1, "bucket": "Important", "urgency": "high"}, ...]
 
-Bucket rules:
-- "Important" = direct personal emails from real people; bill payments due, appointment reminders, healthcare; bank/financial alerts needing YOUR action (Robinhood margin calls, account verification, security alerts — NOT trade confirmations); emails from employer/boss; anything where YOU personally need to do something.
-- "Can Wait" = non-urgent personal emails, low-priority follow-ups, informational emails that don't require immediate action
-- "Newsletter" = marketing emails, promotional deals, food/restaurant offers (Papa John's, DoorDash, Uber Eats etc), brand sales, subscription digests, blog content
-- "Auto-archive" = order confirmations, shipping/delivery notifications, receipts, password resets, automated system alerts, "your account" emails that need no action; Robinhood trade confirmations, dividend notifications, statements, order filled confirmations
-- "Social" = ALL Reddit emails (comments, replies, mentions, trending posts); ALL LinkedIn emails (connections, job alerts, notifications, "don't miss"); ALL Facebook/Instagram/Twitter/TikTok/Snapchat/Discord/dating app notifications; any social network activity whatsoever
-- Custom buckets: use best judgment based on name
-- Bias STRONGLY toward Social for any Reddit/LinkedIn/social platform email — never put these in Important
-- When in doubt between Important and others, use the more specific bucket
+IMPORTANT RULE: "Important" is ONLY for emails where a real human personally addressed the user and expects a response or action. If an email could have been sent to thousands of people automatically, it is NOT Important.
 
-Urgency = how urgently THE USER needs to take action (not how urgent the content is):
-- "high" = user must respond or act TODAY (e.g. payment overdue, meeting in hours, explicit deadline today)
-- "medium" = user should act this week (follow-up needed, upcoming appointment)
-- "low" = no action needed from user, or no deadline (community alerts, FYI emails, newsletters = always "low")
+Bucket rules:
+- "Important" = a real person wrote this specifically to you; personal bills/appointments requiring action; your employer or a colleague; someone waiting on your response. STRICT: if it's automated, a notification, a digest, a tip, an alert, or marketing — it is NOT Important regardless of how urgent it sounds.
+- "Can Wait" = non-urgent personal emails; informational content you may want to read; job application follow-ups; community posts (neighborhood/HOA alerts like "motorcycle accident" or "safety tips" — these are FYI, not action items)
+- "Newsletter" = any marketing email; event registrations; promotional offers; job listing digests (Idealist, Indeed, Glassdoor alerts); course/workshop promotions; health/wellness tips; brand content; anything with "unsubscribe" at the bottom
+- "Auto-archive" = order/payment confirmations; shipping updates; receipts; password resets; "your account" automated emails; ALL Robinhood emails (trade fills, safety tips, account alerts, statements, promotions — all of it); bank transaction alerts that need no action; automated app notifications
+- "Social" = ALL Reddit, LinkedIn, Facebook, Instagram, Twitter/X, TikTok, Snapchat, Discord, dating apps; social network activity of any kind
+- Custom buckets: use best judgment based on the name
+- When in doubt, pick anything EXCEPT Important
+
+Urgency = only how urgently THE USER personally needs to act (never the urgency of world events):
+- "high" = user must act TODAY — overdue payment, same-day deadline, urgent personal request
+- "medium" = user should act this week — upcoming appointment, follow-up needed
+- "low" = everything else, including all automated emails, community alerts, newsletters
 
 Reply with ONLY the JSON array, no other text.`;
 
