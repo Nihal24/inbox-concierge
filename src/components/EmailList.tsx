@@ -29,6 +29,7 @@ function formatDate(dateStr: string): string {
 }
 
 const URGENCY_COLORS = { high: '#ef4444', medium: '#f59e0b', low: 'transparent' };
+const URGENCY_BUCKET = 'Action Required';
 
 const EmailList: React.FC<Props> = ({ bucket, emails, selectedId, bucketColor, onSelect }) => {
   const sorted = bucket === 'Action Required'
@@ -65,10 +66,11 @@ const EmailList: React.FC<Props> = ({ bucket, emails, selectedId, bucketColor, o
                   borderLeft: `3px solid ${selected ? bucketColor : e.unread ? bucketColor + '80' : 'transparent'}`,
                 }}
               >
-                {/* Urgency dot */}
-                {urgencyColor !== 'transparent' && (
-                  <span style={{ ...styles.urgencyDot, backgroundColor: urgencyColor }} />
-                )}
+                {/* Always reserve dot space for consistent alignment; only color in Action Required */}
+                <span style={{
+                  ...styles.urgencyDot,
+                  backgroundColor: bucket === URGENCY_BUCKET ? urgencyColor : 'transparent',
+                }} />
                 <div style={styles.emailContent}>
                   <div style={styles.topRow}>
                     <span style={{
