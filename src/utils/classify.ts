@@ -5,7 +5,7 @@ export const DEFAULT_BUCKETS = ['Action Required', 'Heads Up', 'Newsletter', 'So
 
 export const BUCKET_DESCRIPTIONS: Record<string, string> = {
   'Action Required': 'A real person needs something from you',
-  'Heads Up': 'Worth seeing, no action needed — transactions, alerts, confirmations',
+  'Heads Up': 'Financial transactions, security alerts, package deliveries — check for fraud',
   'Newsletter': 'Subscribed content, digests, blogs, promotions',
   'Social': 'Social platform notifications',
   'Junk': 'Pure noise — marketing, spam, promos you never read',
@@ -64,13 +64,13 @@ Reply ONLY with a JSON array:
 CRITICAL RULE: "Action Required" is ONLY for emails where a real human personally wrote to this user and expects a response or action. Automated emails are NEVER "Action Required".
 
 Bucket rules:
-- "Action Required" = a real person wrote this specifically to you; personal bills/appointments you must act on; your employer, colleague, or friend waiting on you. NEVER automated, NEVER a notification, NEVER marketing.
-- "Heads Up" = automated emails worth monitoring but requiring no action: ALL bank/financial alerts (Wells Fargo, Zelle, Venmo, PayPal, Robinhood trades/confirmations/statements), security alerts, package delivered, account activity, neighborhood/community alerts (HOA, safety posts), order confirmations, shipping updates, receipts, password resets, job application status updates
-- "Newsletter" = marketing emails; promotional offers; food/restaurant deals; event/workshop invitations; job listing digests (Idealist, Indeed); health/wellness tips; brand content; anything with an unsubscribe link that isn't a transaction
-- "Social" = ALL Reddit, LinkedIn, Facebook, Instagram, Twitter/X, TikTok, Snapchat, Discord, dating apps; any social network activity
-- "Junk" = pure spam, irrelevant cold outreach, mass promotional blasts with no personal relevance
+- "Action Required" = a real person wrote this specifically to you and expects a response or action. NEVER automated. Examples: friend emailing you, boss sending a task, doctor reply, recruiter expecting a response.
+- "Heads Up" = ONLY these specific types: financial transactions (bank transfers, Zelle/Venmo/PayPal received or sent, Robinhood trades, stock confirmations, brokerage statements), security/login alerts, package delivered notifications, utility/bill payment confirmations. Keep this bucket SMALL — only things you'd check if you suspected fraud or a problem.
+- "Newsletter" = ALL subscription content: marketing, deals, restaurant promos, event invites, job digests, course ads, health tips, app updates, blog posts, "weekly roundups", anything with an unsubscribe link. Also: community/HOA posts, neighborhood alerts, local updates.
+- "Social" = ALL Reddit, LinkedIn, Facebook, Instagram, Twitter/X, TikTok, Snapchat, Discord, dating apps, any social network.
+- "Junk" = cold outreach, spam, mass blasts with zero relevance to you personally.
 - Custom buckets: use best judgment based on the name
-- Default to "Heads Up" for anything automated and potentially useful, "Newsletter" for subscribed content, "Junk" for obvious noise
+- When unsure between Heads Up and Newsletter, choose Newsletter. Heads Up should have fewer than 20% of total emails.
 
 Urgency = only how urgently THE USER personally needs to act:
 - "high" = must act TODAY — overdue, same-day deadline, urgent personal request
