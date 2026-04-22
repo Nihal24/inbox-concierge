@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { fetchThreads, EmailThread, getLastFetchedTimestamp } from '../utils/gmail';
 import { classifyEmails, ClassifiedEmail, DEFAULT_BUCKETS, generateInboxSummary, InboxSummary } from '../utils/classify';
-import { getMemoryCount } from '../utils/senderMemory';
+import { getMemoryCount, getCustomBuckets, saveCustomBuckets } from '../utils/senderMemory';
 import Sidebar from './Sidebar';
 import EmailList from './EmailList';
 import EmailDetail from './EmailDetail';
@@ -30,7 +30,7 @@ function getBucketColor(bucket: string, allBuckets: string[]): string {
 
 const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
   const [emails, setEmails] = useState<ClassifiedEmail[]>([]);
-  const [buckets, setBuckets] = useState<string[]>(DEFAULT_BUCKETS);
+  const [buckets, setBuckets] = useState<string[]>(() => [...DEFAULT_BUCKETS, ...getCustomBuckets()]);
   const [selectedBucket, setSelectedBucket] = useState<string>(DEFAULT_BUCKETS[0]);
   const [selectedEmail, setSelectedEmail] = useState<ClassifiedEmail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,6 +112,7 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
     const updated = [...buckets, name];
     setBuckets(updated);
     setNewBucket('');
+    saveCustomBuckets(updated.filter((b) => !DEFAULT_BUCKETS.includes(b)));
     runClassification(rawThreads, updated);
   };
 
@@ -119,6 +120,7 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
     if (DEFAULT_BUCKETS.includes(bucket)) return;
     const updated = buckets.filter((b) => b !== bucket);
     setBuckets(updated);
+    saveCustomBuckets(updated.filter((b) => !DEFAULT_BUCKETS.includes(b)));
     if (selectedBucket === bucket) setSelectedBucket(DEFAULT_BUCKETS[0]);
     runClassification(rawThreads, updated);
   };

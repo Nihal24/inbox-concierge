@@ -1,4 +1,17 @@
 const STORAGE_KEY = 'inbox_sender_memory';
+const CUSTOM_BUCKETS_KEY = 'inbox_custom_buckets';
+
+export function getCustomBuckets(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(CUSTOM_BUCKETS_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomBuckets(customBuckets: string[]): void {
+  localStorage.setItem(CUSTOM_BUCKETS_KEY, JSON.stringify(customBuckets));
+}
 
 export interface SenderMemory {
   [senderEmail: string]: string; // email address → bucket

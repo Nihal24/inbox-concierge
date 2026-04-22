@@ -153,12 +153,6 @@ const EmailDetail: React.FC<Props> = ({ email, accessToken, buckets, bucketColor
           )}
         </div>
 
-        {/* Preview */}
-        <div style={styles.section}>
-          <div style={styles.sectionLabel}>Preview</div>
-          <p style={styles.previewText}>{email.snippet}</p>
-        </div>
-
         {/* Move to bucket */}
         <div style={styles.section}>
           <div style={styles.sectionLabel}>
