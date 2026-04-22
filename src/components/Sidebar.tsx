@@ -13,6 +13,7 @@ interface Props {
   newBucket: string;
   onSelectBucket: (b: string) => void;
   onRefresh: () => void;
+  onReclassify: () => void;
   onShowAnalytics: () => void;
   onAddBucket: () => void;
   onRemoveBucket: (b: string) => void;
@@ -23,7 +24,7 @@ interface Props {
 const Sidebar: React.FC<Props> = ({
   buckets, selectedBucket, emails, bucketColors,
   memoryCount, refreshing, newEmailCount, userEmail, newBucket,
-  onSelectBucket, onRefresh, onShowAnalytics, onAddBucket,
+  onSelectBucket, onRefresh, onReclassify, onShowAnalytics, onAddBucket,
   onRemoveBucket, onNewBucketChange, onSignOut,
 }) => {
   const [addingBucket, setAddingBucket] = useState(false);
@@ -54,6 +55,9 @@ const Sidebar: React.FC<Props> = ({
         </button>
         <button onClick={onShowAnalytics} style={styles.actionBtn}>
           <span>📊</span><span>Analytics</span>
+        </button>
+        <button onClick={onReclassify} style={styles.actionBtn}>
+          <span>✦</span><span>Re-classify</span>
         </button>
       </div>
 

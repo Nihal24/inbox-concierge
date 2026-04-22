@@ -94,32 +94,53 @@ Reply with ONLY the JSON array, no other text.`;
   }
 }
 
+const CLASSIFICATION_CACHE_KEY = 'inbox_classification_cache';
+
+type CachedResult = { bucket: string; urgency: 'high' | 'medium' | 'low' };
+
+function loadClassificationCache(): Record<string, CachedResult> {
+  try { return JSON.parse(localStorage.getItem(CLASSIFICATION_CACHE_KEY) || '{}'); }
+  catch { return {}; }
+}
+
+function saveClassificationCache(cache: Record<string, CachedResult>): void {
+  localStorage.setItem(CLASSIFICATION_CACHE_KEY, JSON.stringify(cache));
+}
+
+export function clearClassificationCache(): void {
+  localStorage.removeItem(CLASSIFICATION_CACHE_KEY);
+}
+
 export async function classifyEmails(
   emails: EmailThread[],
   buckets: string[],
-  onProgress: (pct: number) => void
+  onProgress: (pct: number) => void,
+  forceReclassify = false
 ): Promise<ClassifiedEmail[]> {
   const BATCH_SIZE = 25;
   const memory = getSenderMemory();
+  const cache = forceReclassify ? {} : loadClassificationCache();
 
-  // Pre-assign emails from known senders — no Claude call needed
-  const preAssigned: Record<string, { bucket: string; urgency: 'high' | 'medium' | 'low' }> = {};
+  const resultMap: Record<string, CachedResult> = {};
   const needsClassification: EmailThread[] = [];
 
   for (const email of emails) {
+    // 1. Check classification cache first (stable across reloads)
+    if (!forceReclassify && cache[email.id] && buckets.includes(cache[email.id].bucket)) {
+      resultMap[email.id] = cache[email.id];
+      continue;
+    }
+    // 2. Check sender memory (user-corrected preferences)
     const senderEmail = extractEmailAddress(email.from);
     if (memory[senderEmail] && buckets.includes(memory[senderEmail])) {
-      preAssigned[email.id] = { bucket: memory[senderEmail], urgency: 'low' };
-    } else {
-      needsClassification.push(email);
+      resultMap[email.id] = { bucket: memory[senderEmail], urgency: 'low' };
+      continue;
     }
+    // 3. Needs Claude
+    needsClassification.push(email);
   }
 
-  const resultMap: Record<string, { bucket: string; urgency: 'high' | 'medium' | 'low' }> = {
-    ...preAssigned,
-  };
-
-  let completed = Object.keys(preAssigned).length;
+  let completed = emails.length - needsClassification.length;
   onProgress(Math.round((completed / emails.length) * 100));
 
   if (needsClassification.length > 0) {
@@ -136,6 +157,10 @@ export async function classifyEmails(
         onProgress(Math.round((completed / emails.length) * 100));
       })
     );
+
+    // Persist new results to cache
+    const updatedCache = { ...cache, ...resultMap };
+    saveClassificationCache(updatedCache);
   }
 
   return emails.map((e) => ({

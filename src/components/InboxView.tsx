@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { fetchThreads, EmailThread, getLastFetchedTimestamp } from '../utils/gmail';
 import { classifyEmails, ClassifiedEmail, DEFAULT_BUCKETS, generateInboxSummary, InboxSummary } from '../utils/classify';
 import { getMemoryCount, getCustomBuckets, saveCustomBuckets } from '../utils/senderMemory';
+import { clearClassificationCache } from '../utils/classify';
 import Sidebar from './Sidebar';
 import EmailList from './EmailList';
 import EmailDetail from './EmailDetail';
@@ -50,12 +51,12 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
 
   const bucketColorMap = Object.fromEntries(buckets.map((b) => [b, getBucketColor(b, buckets)]));
 
-  const runClassification = useCallback(async (threads: EmailThread[], currentBuckets: string[]) => {
+  const runClassification = useCallback(async (threads: EmailThread[], currentBuckets: string[], force = false) => {
     setReclassifying(true);
     setProgress(0);
     setSummary(null);
     setSelectedEmail(null);
-    const classified = await classifyEmails(threads, currentBuckets, (pct) => setProgress(pct));
+    const classified = await classifyEmails(threads, currentBuckets, (pct) => setProgress(pct), force);
     setEmails(classified);
     setReclassifying(false);
     const s = await generateInboxSummary(classified);
@@ -162,6 +163,7 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
         newBucket={newBucket}
         onSelectBucket={(b) => { setSelectedBucket(b); setSelectedEmail(null); }}
         onRefresh={handleRefresh}
+        onReclassify={() => { clearClassificationCache(); runClassification(rawThreads, bucketsRef.current, true); }}
         onShowAnalytics={() => setShowAnalytics(true)}
         onAddBucket={addBucket}
         onRemoveBucket={removeBucket}
