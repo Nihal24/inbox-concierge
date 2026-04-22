@@ -64,13 +64,13 @@ Reply ONLY with a JSON array:
 CRITICAL RULE: "Action Required" is ONLY for emails where a real human personally wrote to this user and expects a response or action. Automated emails are NEVER "Action Required".
 
 Bucket rules:
-- "Action Required" = a real person wrote this specifically to you and expects a response or action. NEVER automated. Examples: friend emailing you, boss sending a task, doctor reply, recruiter expecting a response.
-- "Heads Up" = ONLY these specific types: financial transactions (bank transfers, Zelle/Venmo/PayPal received or sent, Robinhood trades, stock confirmations, brokerage statements), security/login alerts, package delivered notifications, utility/bill payment confirmations. Keep this bucket SMALL — only things you'd check if you suspected fraud or a problem.
-- "Newsletter" = ALL subscription content: marketing, deals, restaurant promos, event invites, job digests, course ads, health tips, app updates, blog posts, "weekly roundups", anything with an unsubscribe link. Also: community/HOA posts, neighborhood alerts, local updates.
-- "Social" = ALL Reddit, LinkedIn, Facebook, Instagram, Twitter/X, TikTok, Snapchat, Discord, dating apps, any social network.
+- "Action Required" = a real person wrote this specifically to you and expects a response or action. NEVER automated. Examples: friend emailing you, boss sending a task, doctor reply, recruiter personally reaching out.
+- "Heads Up" = ONLY: financial transactions (Zelle/Venmo/PayPal/bank transfers, Robinhood trades/confirmations, brokerage statements), security/login alerts, package delivered. ALSO LinkedIn PERSONAL interactions only: someone sent you a message, connection request from a specific person, someone commented on YOUR post, someone mentioned you. Keep this bucket SMALL.
+- "Newsletter" = ALL subscription content: marketing, deals, promos, event invites, job digests, health tips, app updates, blog posts, weekly roundups. ALSO: Nextdoor emails of any kind (neighborhood posts, nearby activity, local alerts — all Nextdoor goes here). ALSO: LinkedIn general notifications (job recommendations, "X people viewed your profile", suggested connections, "see what's trending", weekly digest, job alerts, "people you may know").
+- "Social" = ALL Reddit, Facebook, Instagram, Twitter/X, TikTok, Snapchat, Discord, dating apps. Any social platform that is NOT LinkedIn or Nextdoor.
 - "Junk" = cold outreach, spam, mass blasts with zero relevance to you personally.
 - Custom buckets: use best judgment based on the name
-- When unsure between Heads Up and Newsletter, choose Newsletter. Heads Up should have fewer than 20% of total emails.
+- Key distinctions: LinkedIn personal interaction → Heads Up. LinkedIn broadcast/algorithm notification → Newsletter. Nextdoor anything → Newsletter. When unsure between Heads Up and Newsletter, choose Newsletter.
 
 Urgency = only how urgently THE USER personally needs to act:
 - "high" = must act TODAY — overdue, same-day deadline, urgent personal request
