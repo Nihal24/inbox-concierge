@@ -61,16 +61,14 @@ ${emailList}
 Reply ONLY with a JSON array:
 [{"index": 1, "bucket": "Important", "urgency": "high"}, ...]
 
-CRITICAL RULE: "Action Required" is ONLY for emails where a real human personally wrote to this user and expects a response or action. Automated emails are NEVER "Action Required".
+Buckets and their intent:
+- "Action Required" = a real human personally wrote to this user and expects a reply or action
+- "Heads Up" = automated but worth monitoring — financial transactions, security alerts, deliveries, or a social platform notifying of a direct personal interaction (a message sent to you, someone connecting with you specifically)
+- "Newsletter" = subscribed content, marketing, promotions, brand emails
+- "Social" = notifications from social networks and community platforms
+- "Junk" = spam, cold outreach, irrelevant mass blasts
 
-Bucket rules:
-- "Action Required" = a real person wrote this specifically to you and expects a response or action. NEVER automated. Examples: friend emailing you, boss sending a task, doctor reply, recruiter personally reaching out.
-- "Heads Up" = ONLY: financial transactions (Zelle/Venmo/PayPal/bank transfers, Robinhood trades/confirmations, brokerage statements), security/login alerts, package delivered confirmations. ALSO LinkedIn PERSONAL interactions: someone sent you a direct message, a specific person sent a connection request, someone commented on YOUR post, someone mentioned you by name. Keep this bucket SMALL.
-- "Newsletter" = actual email subscriptions and marketing ONLY: brand deals/promos, restaurant offers, event invites, course ads, health/wellness tips, blog digests, app product updates, job listing digests (Indeed, Glassdoor, Idealist). NOT social platforms.
-- "Social" = ALL social networks without exception: Reddit, LinkedIn (all non-personal notifications — job alerts, "people viewed your profile", suggested connections, weekly digest, trending posts), Nextdoor (ALL Nextdoor emails — neighborhood posts, nearby activity, local alerts), Facebook, Instagram, Twitter/X, TikTok, Snapchat, Discord, dating apps, any social platform.
-- "Junk" = cold outreach, spam, mass blasts with zero personal relevance.
-- Custom buckets: use best judgment based on the name
-- Key rule: if it comes from a social network platform, it's Social UNLESS it's a LinkedIn direct message/connection request/comment directed personally at you (those go to Heads Up). When unsure between Newsletter and Social, ask: is this from a social platform? If yes → Social.
+Use your best judgment. These descriptions are the intent — you decide what fits.
 
 Urgency = only how urgently THE USER personally needs to act:
 - "high" = must act TODAY — overdue, same-day deadline, urgent personal request
