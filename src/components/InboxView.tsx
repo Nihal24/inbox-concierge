@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { fetchThreads, EmailThread } from '../utils/gmail';
-import { classifyEmails, ClassifiedEmail, DEFAULT_BUCKETS } from '../utils/classify';
+import { classifyEmails, ClassifiedEmail, DEFAULT_BUCKETS, generateInboxSummary, InboxSummary } from '../utils/classify';
 import BucketColumn from './BucketColumn';
+import EmailDetailModal from './EmailDetailModal';
+import AnalyticsPanel from './AnalyticsPanel';
 
 interface Props {
   accessToken: string;
@@ -34,30 +36,42 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
   const [rawThreads, setRawThreads] = useState<EmailThread[]>([]);
   const [newBucket, setNewBucket] = useState('');
   const [reclassifying, setReclassifying] = useState(false);
+  const [summary, setSummary] = useState<InboxSummary | null>(null);
+  const [selectedEmail, setSelectedEmail] = useState<ClassifiedEmail | null>(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+
+  const bucketColorMap = Object.fromEntries(
+    buckets.map((b) => [b, getBucketColor(b, buckets)])
+  );
 
   const runClassification = useCallback(async (threads: EmailThread[], currentBuckets: string[]) => {
     setReclassifying(true);
     setProgress(0);
-    setLoadingMsg('Classifying with AI...');
+    setSummary(null);
     const classified = await classifyEmails(threads, currentBuckets, (pct) => setProgress(pct));
     setEmails(classified);
     setReclassifying(false);
+    const s = await generateInboxSummary(classified);
+    setSummary(s);
   }, []);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      setLoadingMsg('Fetching emails...');
+      setLoadingMsg('Fetching your emails...');
       setProgress(0);
       const threads = await fetchThreads(accessToken);
       setRawThreads(threads);
-      setProgress(30);
+      setProgress(20);
       setLoadingMsg(`Classifying ${threads.length} emails with AI...`);
       const classified = await classifyEmails(threads, DEFAULT_BUCKETS, (pct) =>
-        setProgress(30 + Math.round(pct * 0.7))
+        setProgress(20 + Math.round(pct * 0.75))
       );
       setEmails(classified);
       setLoading(false);
+      setLoadingMsg('Generating summary...');
+      const s = await generateInboxSummary(classified);
+      setSummary(s);
     })();
   }, [accessToken]);
 
@@ -77,10 +91,16 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
     await runClassification(rawThreads, updated);
   };
 
+  const handleBulkArchive = (bucket: string) => {
+    setEmails((prev) => prev.filter((e) => e.bucket !== bucket));
+  };
+
   const emailsByBucket = buckets.reduce<Record<string, ClassifiedEmail[]>>((acc, b) => {
     acc[b] = emails.filter((e) => e.bucket === b);
     return acc;
   }, {});
+
+  const isLoading = loading || reclassifying;
 
   return (
     <div style={styles.container}>
@@ -94,17 +114,21 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
           </div>
         </div>
         <div style={styles.headerRight}>
-          {!loading && (
-            <span style={styles.totalCount}>{emails.length} emails sorted</span>
+          {!loading && emails.length > 0 && (
+            <button onClick={() => setShowAnalytics(true)} style={styles.analyticsBtn}>
+              📊 Analytics
+            </button>
           )}
+          {!loading && <span style={styles.totalCount}>{emails.length} emails sorted</span>}
           <button onClick={onSignOut} style={styles.signOutBtn}>Sign out</button>
         </div>
       </div>
 
-      {/* Loading state */}
-      {(loading || reclassifying) && (
+      {/* Loading overlay */}
+      {isLoading && (
         <div style={styles.loadingOverlay}>
           <div style={styles.loadingCard}>
+            <div style={styles.loadingSpinner}>⟳</div>
             <div style={styles.loadingMsg}>{loadingMsg}</div>
             <div style={styles.progressBar}>
               <div style={{ ...styles.progressFill, width: `${progress}%` }} />
@@ -114,7 +138,24 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
         </div>
       )}
 
-      {/* Bucket toolbar */}
+      {/* Summary card */}
+      {!loading && summary && (
+        <div style={styles.summaryCard}>
+          <div style={styles.summaryLeft}>
+            <span style={styles.aiStar}>✦</span>
+            <div>
+              <div style={styles.summaryHeadline}>{summary.headline}</div>
+              <div style={styles.summaryInsight}>{summary.insight}</div>
+            </div>
+          </div>
+          <div style={styles.noisePill}>
+            <span style={styles.noiseNum}>{summary.noisePercent}%</span>
+            <span style={styles.noiseLabel}>noise</span>
+          </div>
+        </div>
+      )}
+
+      {/* Toolbar */}
       {!loading && (
         <div style={styles.toolbar}>
           <div style={styles.bucketPills}>
@@ -153,9 +194,30 @@ const InboxView: React.FC<Props> = ({ accessToken, userEmail, onSignOut }) => {
               bucket={b}
               emails={emailsByBucket[b] || []}
               color={getBucketColor(b, buckets)}
+              onEmailClick={setSelectedEmail}
+              onBulkArchive={() => handleBulkArchive(b)}
             />
           ))}
         </div>
+      )}
+
+      {/* Email detail modal */}
+      {selectedEmail && (
+        <EmailDetailModal
+          email={selectedEmail}
+          accessToken={accessToken}
+          bucketColor={bucketColorMap[selectedEmail.bucket] || '#888'}
+          onClose={() => setSelectedEmail(null)}
+        />
+      )}
+
+      {/* Analytics panel */}
+      {showAnalytics && (
+        <AnalyticsPanel
+          emails={emails}
+          bucketColors={bucketColorMap}
+          onClose={() => setShowAnalytics(false)}
+        />
       )}
     </div>
   );
@@ -171,120 +233,88 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
   },
   header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '14px 24px',
-    borderBottom: '1px solid #1e2028',
-    backgroundColor: '#0d0f14',
-    flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '14px 24px', borderBottom: '1px solid #1e2028',
+    backgroundColor: '#0d0f14', flexShrink: 0,
   },
   headerLeft: { display: 'flex', alignItems: 'center', gap: 12 },
   logo: { fontSize: 28 },
   appName: { fontSize: 18, fontWeight: 800, color: '#f0f0f0', letterSpacing: -0.5 },
   userEmail: { fontSize: 12, color: '#555', marginTop: 1 },
-  headerRight: { display: 'flex', alignItems: 'center', gap: 16 },
+  headerRight: { display: 'flex', alignItems: 'center', gap: 12 },
+  analyticsBtn: {
+    backgroundColor: '#16181f', border: '1px solid #2a2d35',
+    color: '#c0c0c0', padding: '6px 14px', borderRadius: 8,
+    cursor: 'pointer', fontSize: 13, fontWeight: 600,
+  },
   totalCount: { fontSize: 13, color: '#555' },
   signOutBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid #2a2d35',
-    color: '#888',
-    padding: '6px 14px',
-    borderRadius: 8,
-    cursor: 'pointer',
-    fontSize: 13,
+    backgroundColor: 'transparent', border: '1px solid #2a2d35',
+    color: '#888', padding: '6px 14px', borderRadius: 8,
+    cursor: 'pointer', fontSize: 13,
   },
   loadingOverlay: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
+    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40,
   },
   loadingCard: {
-    backgroundColor: '#111318',
-    border: '1px solid #2a2d35',
-    borderRadius: 16,
-    padding: '40px 48px',
-    textAlign: 'center',
-    minWidth: 320,
+    backgroundColor: '#111318', border: '1px solid #2a2d35',
+    borderRadius: 16, padding: '40px 48px', textAlign: 'center', minWidth: 320,
+  },
+  loadingSpinner: {
+    fontSize: 32, marginBottom: 16, display: 'inline-block',
+    animation: 'spin 1s linear infinite',
+    color: '#3b82f6',
   },
   loadingMsg: { fontSize: 15, color: '#c0c0c0', marginBottom: 20 },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#1e2028',
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#3b82f6',
-    borderRadius: 3,
-    transition: 'width 0.3s ease',
-  },
+  progressBar: { height: 6, backgroundColor: '#1e2028', borderRadius: 3, overflow: 'hidden', marginBottom: 10 },
+  progressFill: { height: '100%', backgroundColor: '#3b82f6', borderRadius: 3, transition: 'width 0.3s ease' },
   progressPct: { fontSize: 13, color: '#555' },
+  summaryCard: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    margin: '12px 24px 0',
+    backgroundColor: '#0d1117', border: '1px solid #1e3a5f',
+    borderRadius: 12, padding: '14px 20px', gap: 16, flexShrink: 0,
+  },
+  summaryLeft: { display: 'flex', alignItems: 'flex-start', gap: 12, flex: 1 },
+  aiStar: { color: '#3b82f6', fontSize: 18, flexShrink: 0, marginTop: 1 },
+  summaryHeadline: { fontSize: 14, fontWeight: 700, color: '#f0f0f0', marginBottom: 3 },
+  summaryInsight: { fontSize: 13, color: '#888', lineHeight: 1.4 },
+  noisePill: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    backgroundColor: '#16181f', borderRadius: 10, padding: '8px 14px',
+    border: '1px solid #2a2d35', flexShrink: 0,
+  },
+  noiseNum: { fontSize: 20, fontWeight: 900, color: '#6b7280' },
+  noiseLabel: { fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 },
   toolbar: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '12px 24px',
-    borderBottom: '1px solid #1e2028',
-    gap: 16,
-    flexWrap: 'wrap',
-    flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '10px 24px', borderBottom: '1px solid #1e2028',
+    gap: 16, flexWrap: 'wrap', flexShrink: 0, marginTop: 12,
   },
   bucketPills: { display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1 },
   bucketPill: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '4px 10px',
-    borderRadius: 20,
-    border: '1px solid',
-    fontSize: 12,
-    backgroundColor: 'transparent',
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '4px 10px', borderRadius: 20, border: '1px solid',
+    fontSize: 12, backgroundColor: 'transparent',
   },
   pillDot: { width: 6, height: 6, borderRadius: '50%', flexShrink: 0 },
   pillLabel: { color: '#c0c0c0', fontWeight: 500 },
   pillCount: { color: '#555', fontSize: 11 },
-  removePill: {
-    background: 'none',
-    border: 'none',
-    color: '#555',
-    cursor: 'pointer',
-    fontSize: 14,
-    padding: '0 2px',
-    lineHeight: 1,
-  },
+  removePill: { background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '0 2px' },
   addBucket: { display: 'flex', gap: 8, alignItems: 'center' },
   bucketInput: {
-    backgroundColor: '#111318',
-    border: '1px solid #2a2d35',
-    borderRadius: 8,
-    padding: '6px 12px',
-    color: '#f0f0f0',
-    fontSize: 13,
-    outline: 'none',
-    width: 160,
+    backgroundColor: '#111318', border: '1px solid #2a2d35',
+    borderRadius: 8, padding: '6px 12px', color: '#f0f0f0',
+    fontSize: 13, outline: 'none', width: 160,
   },
   addBtn: {
-    backgroundColor: '#1d4ed8',
-    border: 'none',
-    borderRadius: 8,
-    color: '#fff',
-    padding: '6px 14px',
-    fontSize: 13,
-    cursor: 'pointer',
-    fontWeight: 600,
+    backgroundColor: '#1d4ed8', border: 'none',
+    borderRadius: 8, color: '#fff', padding: '6px 14px',
+    fontSize: 13, cursor: 'pointer', fontWeight: 600,
   },
   columns: {
-    display: 'flex',
-    gap: 16,
-    padding: '16px 24px',
-    overflowX: 'auto',
-    flex: 1,
-    alignItems: 'flex-start',
+    display: 'flex', gap: 16, padding: '16px 24px',
+    overflowX: 'auto', flex: 1, alignItems: 'flex-start',
   },
 };
 

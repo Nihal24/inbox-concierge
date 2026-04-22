@@ -8,7 +8,6 @@ export interface EmailThread {
 }
 
 export async function fetchThreads(accessToken: string): Promise<EmailThread[]> {
-  // Fetch last 200 thread IDs
   const listRes = await fetch(
     'https://gmail.googleapis.com/gmail/v1/users/me/threads?maxResults=200&q=in:inbox',
     { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -16,7 +15,6 @@ export async function fetchThreads(accessToken: string): Promise<EmailThread[]> 
   const listData = await listRes.json();
   const threads: { id: string }[] = listData.threads || [];
 
-  // Fetch thread details in parallel batches of 20
   const BATCH = 20;
   const results: EmailThread[] = [];
 
@@ -47,4 +45,54 @@ export async function fetchThreads(accessToken: string): Promise<EmailThread[]> 
   }
 
   return results;
+}
+
+function decodeBase64url(str: string): string {
+  try {
+    const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = atob(base64);
+    return decodeURIComponent(escape(decoded));
+  } catch {
+    return '';
+  }
+}
+
+function extractBody(payload: any): string {
+  if (!payload) return '';
+
+  // Direct body
+  if (payload.body?.data) {
+    return decodeBase64url(payload.body.data);
+  }
+
+  // Multipart — prefer text/plain, fall back to text/html
+  if (payload.parts) {
+    const plain = payload.parts.find((p: any) => p.mimeType === 'text/plain');
+    if (plain?.body?.data) return decodeBase64url(plain.body.data);
+
+    const html = payload.parts.find((p: any) => p.mimeType === 'text/html');
+    if (html?.body?.data) {
+      const raw = decodeBase64url(html.body.data);
+      // Strip HTML tags
+      return raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    // Nested multipart
+    for (const part of payload.parts) {
+      const nested = extractBody(part);
+      if (nested) return nested;
+    }
+  }
+
+  return '';
+}
+
+export async function fetchEmailBody(threadId: string, accessToken: string): Promise<string> {
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=full`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  const data = await res.json();
+  const msg = data.messages?.[data.messages.length - 1]; // latest message in thread
+  return extractBody(msg?.payload) || data.snippet || '';
 }
