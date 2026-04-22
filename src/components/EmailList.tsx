@@ -10,9 +10,12 @@ interface Props {
 }
 
 function formatFrom(from: string): string {
+  if (!from) return '(unknown sender)';
   const match = from.match(/^"?([^"<]+)"?\s*</);
-  if (match) return match[1].trim();
-  return from.replace(/<.*>/, '').trim() || from;
+  if (match && match[1].trim()) return match[1].trim();
+  const emailMatch = from.match(/<([^>]+)>/);
+  if (emailMatch) return emailMatch[1];
+  return from.trim() || '(unknown sender)';
 }
 
 function formatDate(dateStr: string): string {
@@ -88,12 +91,15 @@ const EmailList: React.FC<Props> = ({ bucket, emails, selectedId, bucketColor, o
                     ...styles.subject,
                     fontWeight: e.unread ? 600 : 400,
                     color: selected ? '#1a1a1a' : e.unread ? '#222' : '#777',
+                    fontStyle: e.subject === '(no subject)' ? 'italic' : 'normal',
                   }}>
-                    {e.subject}
+                    {e.subject !== '(no subject)' ? e.subject : (e.snippet || '(no subject)')}
                   </div>
-                  <div style={{ ...styles.snippet, color: selected ? '#666' : '#999' }}>
-                    {e.snippet}
-                  </div>
+                  {e.subject !== '(no subject)' && (
+                    <div style={{ ...styles.snippet, color: selected ? '#666' : '#999' }}>
+                      {e.snippet}
+                    </div>
+                  )}
                 </div>
               </div>
             );
