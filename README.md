@@ -91,12 +91,3 @@ This warning exists because `gmail.modify` is a restricted scope requiring a Goo
 - Recharts (analytics)
 - Vercel (deployment)
 
----
-
-## What I'd improve in production
-
-- **Backend proxy** — move the Anthropic API key server-side (Supabase Edge Function)
-- **Server-side cache** — classification cache keyed by user + thread ID with 24hr TTL
-- **Real feedback loop** — log every user correction as a training signal, feed back into the prompt as personalized few-shot examples so Claude learns each user's specific preferences over time
-- **Deeper Gmail integration** — apply labels and archive directly in Gmail
-- **OAuth verification** — complete Google's security review to remove the unverified warning
