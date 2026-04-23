@@ -24,7 +24,7 @@ export interface InboxSummary {
 
 const ANTHROPIC_KEY = process.env.REACT_APP_ANTHROPIC_API_KEY!;
 
-async function callClaude(prompt: string, maxTokens = 1024): Promise<string> {
+async function callClaude(prompt: string, maxTokens = 1024, model = 'claude-sonnet-4-6'): Promise<string> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -34,24 +34,53 @@ async function callClaude(prompt: string, maxTokens = 1024): Promise<string> {
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `Claude API error ${res.status}`);
+  }
   const data = await res.json();
   let text: string = data.content?.[0]?.text?.trim() || '';
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
   return text;
 }
 
+export interface ClassificationExample {
+  from: string;
+  subject: string;
+  bucket: string;
+}
+
+export function buildContextExamples(classified: ClassifiedEmail[], maxPerBucket = 4): ClassificationExample[] {
+  const byBucket: Record<string, ClassificationExample[]> = {};
+  for (const e of classified) {
+    if (!byBucket[e.bucket]) byBucket[e.bucket] = [];
+    if (byBucket[e.bucket].length < maxPerBucket) {
+      byBucket[e.bucket].push({ from: e.from, subject: e.subject, bucket: e.bucket });
+    }
+  }
+  return Object.values(byBucket).flat();
+}
+
 async function classifyBatch(
   emails: EmailThread[],
-  buckets: string[]
+  buckets: string[],
+  model: string,
+  contextExamples?: ClassificationExample[]
 ): Promise<{ id: string; bucket: string; urgency: 'high' | 'medium' | 'low' }[]> {
   const emailList = emails
     .map((e, i) => `${i + 1}. From: ${e.from} | Subject: ${e.subject} | Preview: ${e.snippet.slice(0, 120)}`)
     .join('\n');
+
+  const examplesBlock = contextExamples && contextExamples.length > 0
+    ? `\nFor reference, here is how a previous pass classified similar emails in this inbox:\n${
+        contextExamples.map((ex) => `- From: ${ex.from} | Subject: ${ex.subject} → ${ex.bucket}`).join('\n')
+      }\nApply consistent judgment.\n`
+    : '';
 
   const prompt = `You are classifying emails. Available buckets: ${buckets.join(', ')}.
 
@@ -70,6 +99,8 @@ Buckets and their intent:
 
 Use your best judgment. These descriptions are the intent — you decide what fits.
 
+For any additional buckets beyond the five above, assign emails that clearly match that bucket name by sender name, brand, or topic (e.g. if a bucket is called "Volo", put emails from or about Volo there).
+${examplesBlock}
 Urgency = only how urgently THE USER personally needs to act:
 - "high" = must act TODAY — overdue, same-day deadline, urgent personal request
 - "medium" = should act this week — upcoming appointment, reply needed soon
@@ -77,7 +108,7 @@ Urgency = only how urgently THE USER personally needs to act:
 
 Reply with ONLY the JSON array, no other text.`;
 
-  const text = await callClaude(prompt);
+  const text = await callClaude(prompt, 1200, model);
   const arrayMatch = text.match(/\[[\s\S]*\]/);
   const cleaned = arrayMatch ? arrayMatch[0] : text;
 
@@ -94,49 +125,26 @@ Reply with ONLY the JSON array, no other text.`;
   }
 }
 
-const CLASSIFICATION_CACHE_KEY = 'inbox_classification_cache';
-
-type CachedResult = { bucket: string; urgency: 'high' | 'medium' | 'low' };
-
-function loadClassificationCache(): Record<string, CachedResult> {
-  try { return JSON.parse(localStorage.getItem(CLASSIFICATION_CACHE_KEY) || '{}'); }
-  catch { return {}; }
-}
-
-function saveClassificationCache(cache: Record<string, CachedResult>): void {
-  localStorage.setItem(CLASSIFICATION_CACHE_KEY, JSON.stringify(cache));
-}
-
-export function clearClassificationCache(): void {
-  localStorage.removeItem(CLASSIFICATION_CACHE_KEY);
-}
-
 export async function classifyEmails(
   emails: EmailThread[],
   buckets: string[],
   onProgress: (pct: number) => void,
-  forceReclassify = false
+  model = 'claude-sonnet-4-6',
+  contextExamples?: ClassificationExample[]
 ): Promise<ClassifiedEmail[]> {
   const BATCH_SIZE = 25;
   const memory = getSenderMemory();
-  const cache = forceReclassify ? {} : loadClassificationCache();
 
-  const resultMap: Record<string, CachedResult> = {};
+  const resultMap: Record<string, { bucket: string; urgency: 'high' | 'medium' | 'low' }> = {};
   const needsClassification: EmailThread[] = [];
 
   for (const email of emails) {
-    // 1. Check classification cache first (stable across reloads)
-    if (!forceReclassify && cache[email.id] && buckets.includes(cache[email.id].bucket)) {
-      resultMap[email.id] = cache[email.id];
-      continue;
-    }
-    // 2. Check sender memory (user-corrected preferences)
+    // Check sender memory (user-corrected preferences)
     const senderEmail = extractEmailAddress(email.from);
     if (memory[senderEmail] && buckets.includes(memory[senderEmail])) {
       resultMap[email.id] = { bucket: memory[senderEmail], urgency: 'low' };
       continue;
     }
-    // 3. Needs Claude
     needsClassification.push(email);
   }
 
@@ -151,16 +159,12 @@ export async function classifyEmails(
 
     await Promise.all(
       batches.map(async (batch) => {
-        const results = await classifyBatch(batch, buckets);
+        const results = await classifyBatch(batch, buckets, model, contextExamples);
         results.forEach((r) => { resultMap[r.id] = { bucket: r.bucket, urgency: r.urgency }; });
         completed += batch.length;
         onProgress(Math.round((completed / emails.length) * 100));
       })
     );
-
-    // Persist new results to cache
-    const updatedCache = { ...cache, ...resultMap };
-    saveClassificationCache(updatedCache);
   }
 
   return emails.map((e) => ({
@@ -176,7 +180,7 @@ export async function generateInboxSummary(emails: ClassifiedEmail[]): Promise<I
 
   const important = emails.filter((e) => e.bucket === 'Action Required');
   const highUrgency = important.filter((e) => e.urgency === 'high');
-  const noiseCount = (bucketCounts['Newsletter'] || 0) + (bucketCounts['Junk'] || 0) + (bucketCounts['Social'] || 0);
+  const noiseCount = (bucketCounts['Newsletter'] || 0) + (bucketCounts['Auto-archive'] || 0) + (bucketCounts['Social'] || 0);
   const noisePercent = Math.round((noiseCount / emails.length) * 100);
 
   const importantSubjects = important.slice(0, 5).map((e) => e.subject).join(', ');

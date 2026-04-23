@@ -113,6 +113,17 @@ function extractBody(payload: any): string {
   return '';
 }
 
+export async function trashThread(threadId: string, accessToken: string): Promise<void> {
+  await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/trash`,
+    { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+}
+
+export async function trashThreads(threadIds: string[], accessToken: string): Promise<void> {
+  await Promise.all(threadIds.map((id) => trashThread(id, accessToken)));
+}
+
 export async function fetchEmailBody(threadId: string, accessToken: string): Promise<string> {
   const res = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=full`,

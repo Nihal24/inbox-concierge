@@ -1,5 +1,18 @@
 const STORAGE_KEY = 'inbox_sender_memory';
 const CUSTOM_BUCKETS_KEY = 'inbox_custom_buckets';
+const REMOVED_DEFAULTS_KEY = 'inbox_removed_defaults';
+
+export function getRemovedDefaultBuckets(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(REMOVED_DEFAULTS_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+export function saveRemovedDefaultBuckets(removed: string[]): void {
+  localStorage.setItem(REMOVED_DEFAULTS_KEY, JSON.stringify(removed));
+}
 
 export function getCustomBuckets(): string[] {
   try {

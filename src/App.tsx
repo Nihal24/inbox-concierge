@@ -1,20 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import InboxView from './components/InboxView';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID!;
-const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly email profile';
+const SCOPES = 'https://www.googleapis.com/auth/gmail.modify email profile';
+
+const TOKEN_KEY = 'inbox_access_token';
+const TOKEN_EXPIRY_KEY = 'inbox_token_expiry';
+const USER_EMAIL_KEY = 'inbox_user_email';
 
 declare global {
-  interface Window {
-    google: any;
-    tokenClient: any;
-  }
+  interface Window { google: any; tokenClient: any; }
 }
 
 const App: React.FC = () => {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState('');
   const [gsiReady, setGsiReady] = useState(false);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userEmailRef = useRef(userEmail);
+  userEmailRef.current = userEmail;
 
   useEffect(() => {
     const script = document.createElement('script');
@@ -25,32 +30,76 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!gsiReady) return;
+
     window.tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPES,
       callback: async (resp: any) => {
-        if (resp.error) return;
+        if (resp.error) return; // silent refresh failed — user stays on login screen
+
+        const expiry = Date.now() + 55 * 60 * 1000;
+        localStorage.setItem(TOKEN_KEY, resp.access_token);
+        localStorage.setItem(TOKEN_EXPIRY_KEY, String(expiry));
         setAccessToken(resp.access_token);
-        const info = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${resp.access_token}` },
-        }).then((r) => r.json());
-        setUserEmail(info.email || '');
+
+        // Fetch email only on first sign-in, not on silent refresh
+        if (!userEmailRef.current) {
+          const info = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${resp.access_token}` },
+          }).then((r) => r.json());
+          const email = info.email || '';
+          setUserEmail(email);
+          localStorage.setItem(USER_EMAIL_KEY, email);
+        }
+
+        // Schedule next silent refresh
+        if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = setTimeout(() => {
+          window.tokenClient.requestAccessToken({ prompt: '' });
+        }, 55 * 60 * 1000);
       },
     });
-  }, [gsiReady]);
+
+    // Restore session from localStorage
+    const storedToken = localStorage.getItem(TOKEN_KEY);
+    const storedExpiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
+    const storedEmail = localStorage.getItem(USER_EMAIL_KEY);
+
+    if (storedToken && storedExpiry && Date.now() < parseInt(storedExpiry)) {
+      // Token still valid — restore immediately, no login prompt
+      setAccessToken(storedToken);
+      if (storedEmail) setUserEmail(storedEmail);
+      userEmailRef.current = storedEmail || '';
+      const remaining = parseInt(storedExpiry) - Date.now();
+      refreshTimerRef.current = setTimeout(() => {
+        window.tokenClient.requestAccessToken({ prompt: '' });
+      }, remaining);
+    } else {
+      // Try silent refresh (works if user's Google session is still active)
+      window.tokenClient.requestAccessToken({ prompt: '' });
+    }
+  }, [gsiReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSignIn = () => {
     if (window.tokenClient) window.tokenClient.requestAccessToken({ prompt: 'consent' });
   };
 
   const handleSignOut = () => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     if (accessToken) window.google.accounts.oauth2.revoke(accessToken);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_EXPIRY_KEY);
+    localStorage.removeItem(USER_EMAIL_KEY);
     setAccessToken(null);
     setUserEmail('');
   };
 
   if (accessToken) {
-    return <InboxView accessToken={accessToken} userEmail={userEmail} onSignOut={handleSignOut} />;
+    return (
+      <ErrorBoundary>
+        <InboxView accessToken={accessToken} userEmail={userEmail} onSignOut={handleSignOut} />
+      </ErrorBoundary>
+    );
   }
 
   return (
@@ -78,40 +127,23 @@ const App: React.FC = () => {
 
 const styles: Record<string, React.CSSProperties> = {
   loginPage: {
-    minHeight: '100vh',
-    backgroundColor: '#0d0f14',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+    minHeight: '100vh', backgroundColor: '#0d0f14',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   loginCard: {
-    backgroundColor: '#111318',
-    border: '1px solid #2a2d35',
-    borderRadius: 20,
-    padding: '48px 40px',
-    textAlign: 'center',
-    maxWidth: 400,
-    width: '100%',
-    margin: '0 20px',
+    backgroundColor: '#111318', border: '1px solid #2a2d35',
+    borderRadius: 20, padding: '48px 40px',
+    textAlign: 'center', maxWidth: 400, width: '100%', margin: '0 20px',
   },
   loginIcon: { fontSize: 52, marginBottom: 16 },
   loginTitle: { fontSize: 28, fontWeight: 800, color: '#f0f0f0', margin: '0 0 12px', letterSpacing: -0.5 },
   loginSubtitle: { fontSize: 15, color: '#666', margin: '0 0 32px', lineHeight: 1.5 },
   googleBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    padding: '13px 20px',
-    backgroundColor: '#fff',
-    border: 'none',
-    borderRadius: 10,
-    fontSize: 15,
-    fontWeight: 600,
-    color: '#1a1a1a',
-    cursor: 'pointer',
-    marginBottom: 16,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: '100%', padding: '13px 20px',
+    backgroundColor: '#fff', border: 'none', borderRadius: 10,
+    fontSize: 15, fontWeight: 600, color: '#1a1a1a', cursor: 'pointer', marginBottom: 16,
   },
   disclaimer: { fontSize: 12, color: '#444', margin: 0 },
 };

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ClassifiedEmail, summarizeEmail, InboxSummary } from '../utils/classify';
-import { fetchEmailBody } from '../utils/gmail';
+import { fetchEmailBody, trashThread } from '../utils/gmail';
 import { saveSenderPreference } from '../utils/senderMemory';
+import ConfirmModal from './ConfirmModal';
 
 interface Props {
   email: ClassifiedEmail | null;
@@ -9,8 +10,11 @@ interface Props {
   buckets: string[];
   bucketColors: Record<string, string>;
   inboxSummary: InboxSummary | null;
+  isMobile?: boolean;
+  onBack?: () => void;
   onMove: (emailId: string, newBucket: string) => void;
   onMemoryUpdate: () => void;
+  onDelete: (emailId: string) => void;
 }
 
 function formatFrom(from: string): string {
@@ -58,16 +62,14 @@ const EmptyState: React.FC<{ summary: InboxSummary | null }> = ({ summary }) => 
   </div>
 );
 
-const EmailDetail: React.FC<Props> = ({ email, accessToken, buckets, bucketColors, inboxSummary, onMove, onMemoryUpdate }) => {
+const EmailDetail: React.FC<Props> = ({ email, accessToken, buckets, bucketColors, inboxSummary, isMobile, onBack, onMove, onMemoryUpdate, onDelete }) => {
   const [summary, setSummary] = useState<string | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [movedTo, setMovedTo] = useState<string | null>(null);
-  const [showMoveMenu, setShowMoveMenu] = useState(false);
-
+  const [confirmDelete, setConfirmDelete] = useState(false);
   useEffect(() => {
     if (!email) return;
     setMovedTo(null);
-    setShowMoveMenu(false);
     setSummary(null);
     setLoadingSummary(true);
     (async () => {
@@ -76,16 +78,21 @@ const EmailDetail: React.FC<Props> = ({ email, accessToken, buckets, bucketColor
       setSummary(s);
       setLoadingSummary(false);
     })();
-  }, [email?.id, accessToken]);
+  }, [email?.id, accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!email) return <EmptyState summary={inboxSummary} />;
+
+  const handleDelete = async () => {
+    await trashThread(email.id, accessToken);
+    setConfirmDelete(false);
+    onDelete(email.id);
+  };
 
   const handleMove = (bucket: string) => {
     saveSenderPreference(email.from, bucket);
     onMove(email.id, bucket);
     onMemoryUpdate();
     setMovedTo(bucket);
-    setShowMoveMenu(false);
   };
 
   const currentBucket = movedTo || email.bucket;
@@ -94,10 +101,14 @@ const EmailDetail: React.FC<Props> = ({ email, accessToken, buckets, bucketColor
   const urgCfg = URGENCY_CONFIG[urgency];
 
   return (
+    <>
     <div style={styles.pane}>
       {/* Email header */}
       <div style={styles.header}>
         <div style={styles.headerTop}>
+          {isMobile && onBack && (
+            <button onClick={onBack} style={styles.backBtn}>←</button>
+          )}
           <div style={styles.bucketTag}>
             <span style={{ ...styles.bucketDot, backgroundColor: bucketColor }} />
             <span style={{ ...styles.bucketLabel, color: bucketColor }}>{currentBucket}</span>
@@ -124,6 +135,7 @@ const EmailDetail: React.FC<Props> = ({ email, accessToken, buckets, bucketColor
             >
               ↩ Reply
             </a>
+            <button onClick={() => setConfirmDelete(true)} style={styles.deleteBtn} title="Move to trash">🗑</button>
           </div>
         </div>
         <h2 style={styles.subject}>{email.subject}</h2>
@@ -182,6 +194,16 @@ const EmailDetail: React.FC<Props> = ({ email, accessToken, buckets, bucketColor
         </div>
       </div>
     </div>
+    {confirmDelete && (
+      <ConfirmModal
+        title="Move to trash?"
+        message={`"${email.subject}" will be moved to your Gmail trash.`}
+        confirmLabel="Trash"
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
+    )}
+    </>
   );
 };
 
@@ -216,6 +238,15 @@ const styles: Record<string, React.CSSProperties> = {
   },
   actionLinkPrimary: {
     backgroundColor: '#1d4ed8', color: '#fff', border: 'none',
+  },
+  deleteBtn: {
+    background: 'none', border: '1px solid #e5e7eb', borderRadius: 7,
+    padding: '5px 10px', cursor: 'pointer', fontSize: 13,
+    color: '#999', backgroundColor: '#fafafa',
+  },
+  backBtn: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: 18, color: '#555', padding: '0 10px 0 0', lineHeight: 1, flexShrink: 0,
   },
   subject: {
     fontSize: 20, fontWeight: 700, color: '#1a1a1a',

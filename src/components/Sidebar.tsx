@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ClassifiedEmail, DEFAULT_BUCKETS, BUCKET_DESCRIPTIONS } from '../utils/classify';
+import ConfirmModal from './ConfirmModal';
 
 interface Props {
   buckets: string[];
@@ -11,6 +12,7 @@ interface Props {
   newEmailCount: number | null;
   userEmail: string;
   newBucket: string;
+  isMobile?: boolean;
   onSelectBucket: (b: string) => void;
   onRefresh: () => void;
   onReclassify: () => void;
@@ -23,18 +25,19 @@ interface Props {
 
 const Sidebar: React.FC<Props> = ({
   buckets, selectedBucket, emails, bucketColors,
-  memoryCount, refreshing, newEmailCount, userEmail, newBucket,
+  memoryCount, refreshing, newEmailCount, userEmail, newBucket, isMobile,
   onSelectBucket, onRefresh, onReclassify, onShowAnalytics, onAddBucket,
   onRemoveBucket, onNewBucketChange, onSignOut,
 }) => {
   const [addingBucket, setAddingBucket] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   const countFor = (b: string) => emails.filter((e) => e.bucket === b).length;
   const unreadFor = (b: string) => emails.filter((e) => e.bucket === b && e.unread).length;
 
   return (
-    <div style={styles.sidebar}>
+    <div style={{ ...styles.sidebar, width: isMobile ? '100%' : 220 }}>
       {/* Logo */}
       <div style={styles.logoRow}>
         <span style={styles.logoIcon}>📬</span>
@@ -82,15 +85,13 @@ const Sidebar: React.FC<Props> = ({
               <span style={{ ...styles.bucketDot, backgroundColor: bucketColors[b] || '#666' }} />
               <span style={{ ...styles.bucketName, fontWeight: active ? 700 : 400 }}>{b}</span>
               <div style={styles.bucketMeta}>
-                {unread > 0 && <span style={{ ...styles.unreadDot, backgroundColor: bucketColors[b] || '#666' }} />}
+                <span style={{ ...styles.unreadDot, backgroundColor: unread > 0 ? (bucketColors[b] || '#666') : 'transparent' }} />
                 <span style={styles.bucketCount}>{count}</span>
               </div>
-              {!DEFAULT_BUCKETS.includes(b) && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onRemoveBucket(b); }}
-                  style={styles.removeBtn}
-                >×</button>
-              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); setConfirmRemove(b); }}
+                style={styles.removeBtn}
+              >×</button>
             </div>
           );
         })}
@@ -150,6 +151,15 @@ const Sidebar: React.FC<Props> = ({
         )}
         <button onClick={onSignOut} style={styles.signOutBtn}>Sign out</button>
       </div>
+    {confirmRemove && (
+      <ConfirmModal
+        title={`Remove "${confirmRemove}"?`}
+        message={`Emails in this bucket will be re-classified into your remaining buckets.`}
+        confirmLabel="Remove"
+        onConfirm={() => { onRemoveBucket(confirmRemove); setConfirmRemove(null); }}
+        onCancel={() => setConfirmRemove(null)}
+      />
+    )}
     </div>
   );
 };
