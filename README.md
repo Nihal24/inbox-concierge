@@ -1,46 +1,102 @@
-# Getting Started with Create React App
+# Inbox Concierge
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+AI-powered email triage. Connects to your Gmail and automatically sorts your last 200 emails into smart buckets using Claude.
 
-## Available Scripts
+**Live app:** https://inbox-concierge-one.vercel.app
 
-In the project directory, you can run:
+---
 
-### `npm start`
+## What it does
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+- Fetches your last 200 Gmail threads (metadata only — subject, sender, snippet)
+- Classifies them into buckets using Claude Sonnet: **Action Required, Heads Up, Newsletter, Social, Junk**
+- Scores urgency on Action Required emails (high / medium / low)
+- Generates a 2-sentence AI summary when you open an email
+- Remembers sender preferences — move an email to a bucket once, that sender always goes there (skips Claude entirely)
+- Supports custom buckets — add any bucket and the whole inbox re-classifies around it
+- Incremental refresh — only fetches and classifies new emails since last load, using Haiku for speed
+- Trash individual emails or entire buckets
+- Analytics panel — bucket breakdown, top senders, noise percentage
+- Mobile responsive — single pane navigation on small screens
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+---
 
-### `npm test`
+## Architecture
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```
+Gmail API (metadata) → Claude Sonnet (batches of 25, parallel) → Three-pane UI
+                                                                        ↓
+                                                              Sender memory (localStorage)
+                                                              skips Claude for known senders
+```
 
-### `npm run build`
+- **First load** — Claude Sonnet classifies all 200 emails in parallel batches of 25
+- **Refresh** — Claude Haiku classifies only new emails, with Sonnet's prior classifications as context
+- **No backend** — Claude API called directly from the browser via Anthropic's direct browser access header
+- **Session persistence** — Google OAuth token stored in localStorage, silent refresh at 55 minutes
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+---
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Running locally
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+**Prerequisites**
+- Node.js 16+
+- A Google Cloud project with Gmail API enabled and OAuth 2.0 credentials
+- An Anthropic API key
 
-### `npm run eject`
+**1. Clone the repo**
+```bash
+git clone https://github.com/Nihal24/inbox-concierge.git
+cd inbox-concierge
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+**2. Install dependencies**
+```bash
+npm install
+```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+**3. Create a `.env` file in the root**
+```
+REACT_APP_GOOGLE_CLIENT_ID=your_google_client_id
+REACT_APP_ANTHROPIC_API_KEY=your_anthropic_api_key
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+**4. Add `http://localhost:3000` to your Google OAuth authorized origins**
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+In Google Cloud Console → APIs & Services → Credentials → your OAuth 2.0 Client:
+- Authorized JavaScript origins: `http://localhost:3000`
 
-## Learn More
+**5. Start the app**
+```bash
+npm start
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Opens at `http://localhost:3000`
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+---
+
+## Google OAuth note
+
+The app uses `gmail.modify` scope which allows reading and trashing emails. When signing in you'll see an "unverified app" warning — click **Advanced → Go to Inbox Concierge** to proceed.
+
+This warning exists because `gmail.modify` is a restricted scope requiring a Google security audit for production verification. For a prototype this is expected.
+
+---
+
+## Tech stack
+
+- React + TypeScript
+- Gmail REST API
+- Claude Sonnet 4.6 (initial classification) / Claude Haiku 4.5 (incremental refresh)
+- Recharts (analytics)
+- Vercel (deployment)
+
+---
+
+## What I'd improve in production
+
+- **Backend proxy** — move the Anthropic API key server-side (Supabase Edge Function)
+- **Server-side cache** — classification cache keyed by user + thread ID with 24hr TTL
+- **Real feedback loop** — log every user correction as a training signal, feed back into the prompt as personalized few-shot examples so Claude learns each user's specific preferences over time
+- **Deeper Gmail integration** — apply labels and archive directly in Gmail
+- **OAuth verification** — complete Google's security review to remove the unverified warning
